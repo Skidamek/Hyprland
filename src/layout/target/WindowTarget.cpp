@@ -308,7 +308,8 @@ std::expected<SGeometryRequested, eGeometryFailure> CWindowTarget::desiredGeomet
                 const auto POS = PARENT->m_realPosition->goal() + PARENT->m_realSize->goal() / 2.F - DESIRED_GEOM.size() / 2.F;
                 requested.pos  = POS;
             }
-        }
+        } else
+            requested.pos.reset();
     } else {
         // if it is, we respect where it wants to put itself, but apply monitor offset if outside
         // most of these are popups
