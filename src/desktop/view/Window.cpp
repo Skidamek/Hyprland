@@ -2340,6 +2340,19 @@ void CWindow::commitWindow() {
             }
         }
     }
+
+    // VRR: mark new content from the fullscreen client so the compositor
+    // knows to composite rather than suppressing the frame.
+    if (PMONITOR && PMONITOR->m_vrrActive && !PMONITOR->m_tearingState.nextRenderTorn && wlSurface()->resource()->m_current.texture) {
+        const auto PWORKSPACE = PMONITOR->m_activeWorkspace;
+        if (PWORKSPACE && PWORKSPACE->m_hasFullscreenWindow && PWORKSPACE->getFullscreenWindow().get() == this) {
+            CRegion damageBox{wlSurface()->resource()->m_current.accumulateBufferDamage()};
+            if (!damageBox.empty()) {
+                PMONITOR->m_vrrFramePending = true;
+                g_pCompositor->scheduleFrameForMonitor(PMONITOR, Aquamarine::IOutput::AQ_SCHEDULE_NEEDS_FRAME);
+            }
+        }
+    }
 }
 
 void CWindow::destroyWindow() {

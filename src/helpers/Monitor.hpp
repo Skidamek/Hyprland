@@ -137,6 +137,7 @@ class CMonitor {
 
     bool                        m_dpmsStatus       = true;
     bool                        m_vrrActive        = false; // this can be TRUE even if VRR is not active in the case that this display does not support it.
+    bool                        m_vrrFramePending  = false; // true when the fullscreen VRR window has committed new content since the last composite
     bool                        m_enabled10bit     = false; // as above, this can be TRUE even if 10 bit failed.
     NCMType::eCMType            m_cmType           = NCMType::CM_SRGB;
     NTransferFunction::eTF      m_sdrEotf          = NTransferFunction::TF_DEFAULT;

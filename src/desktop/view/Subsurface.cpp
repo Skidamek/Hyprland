@@ -1,4 +1,5 @@
 #include "Subsurface.hpp"
+#include "../../Compositor.hpp"
 #include "../state/FocusState.hpp"
 #include "Window.hpp"
 #include "../../config/ConfigValue.hpp"
@@ -162,6 +163,20 @@ void CSubsurface::onCommit() {
         damageLastArea();
         m_lastSize     = m_wlSurface->resource()->m_current.size;
         m_lastPosition = m_subsurface->m_position;
+    }
+
+    // VRR: mark new content from a subsurface of the fullscreen client.
+    // Critical for Proton/Wine native Wayland games that render into a subsurface.
+    if (!m_windowParent.expired()) {
+        const auto PWINDOW  = m_windowParent.lock();
+        const auto PMONITOR = PWINDOW->m_monitor.lock();
+        if (PMONITOR && PMONITOR->m_vrrActive) {
+            const auto PWORKSPACE = PMONITOR->m_activeWorkspace;
+            if (PWORKSPACE && PWORKSPACE->m_hasFullscreenWindow && PWORKSPACE->getFullscreenWindow() == PWINDOW) {
+                PMONITOR->m_vrrFramePending = true;
+                g_pCompositor->scheduleFrameForMonitor(PMONITOR, Aquamarine::IOutput::AQ_SCHEDULE_NEEDS_FRAME);
+            }
+        }
     }
 }
 

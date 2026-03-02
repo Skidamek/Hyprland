@@ -1814,7 +1814,8 @@ void CConfigManager::ensureVRR(PHLMONITOR pMonitor) {
                 if (!m->m_state.commit())
                     Log::logger->log(Log::ERR, "Couldn't commit output {} in ensureVRR -> false", m->m_output->name);
             }
-            m->m_vrrActive = false;
+            m->m_vrrActive       = false;
+            m->m_vrrFramePending = false;
             return;
         }
 
@@ -1837,6 +1838,10 @@ void CConfigManager::ensureVRR(PHLMONITOR pMonitor) {
 
                     if (!m->m_state.commit())
                         Log::logger->log(Log::ERR, "Couldn't commit output {} in ensureVRR -> true", m->m_output->name);
+
+                    m->m_vrrFramePending = false;
+                    m->m_forceFullFrames = std::max(m->m_forceFullFrames, 1);
+                    g_pCompositor->scheduleFrameForMonitor(m, Aquamarine::IOutput::AQ_SCHEDULE_NEEDS_FRAME);
                 }
                 m->m_vrrActive = true;
             } else {
@@ -1847,7 +1852,8 @@ void CConfigManager::ensureVRR(PHLMONITOR pMonitor) {
                     if (!m->m_state.commit())
                         Log::logger->log(Log::ERR, "Couldn't commit output {} in ensureVRR -> false", m->m_output->name);
                 }
-                m->m_vrrActive = false;
+                m->m_vrrActive       = false;
+                m->m_vrrFramePending = false;
             }
             return;
         } else if (USEVRR == 2 || USEVRR == 3) {
@@ -1865,6 +1871,11 @@ void CConfigManager::ensureVRR(PHLMONITOR pMonitor) {
 
             if (wantVRR) {
                 /* fullscreen */
+                if (!m->m_vrrActive) {
+                    m->m_vrrFramePending = false;
+                    m->m_forceFullFrames = std::max(m->m_forceFullFrames, 1);
+                    g_pCompositor->scheduleFrameForMonitor(m, Aquamarine::IOutput::AQ_SCHEDULE_NEEDS_FRAME);
+                }
                 m->m_vrrActive = true;
 
                 if (!m->m_output->state->state().adaptiveSync) {
@@ -1876,7 +1887,8 @@ void CConfigManager::ensureVRR(PHLMONITOR pMonitor) {
                     }
                 }
             } else {
-                m->m_vrrActive = false;
+                m->m_vrrActive       = false;
+                m->m_vrrFramePending = false;
 
                 m->m_output->state->setAdaptiveSync(false);
             }

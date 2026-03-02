@@ -1329,6 +1329,21 @@ void CHyprRenderer::renderMonitor(PHLMONITOR pMonitor, bool commit) {
         pMonitor->m_drmFormat = pMonitor->m_prevDrmFormat;
     }
 
+    // VRR frame suppression: skip compositing when the fullscreen client hasn't
+    // committed new content, so the monitor can actually vary its refresh rate.
+    if (pMonitor->m_vrrActive && !pMonitor->m_tearingState.activelyTearing && pMonitor->m_forceFullFrames == 0) {
+        static auto PMINRR     = CConfigValue<Hyprlang::INT>("cursor:min_refresh_rate");
+        const auto  PWORKSPACE = pMonitor->m_activeWorkspace;
+        if (PWORKSPACE && PWORKSPACE->m_hasFullscreenWindow) {
+            if (!pMonitor->m_vrrFramePending) {
+                const bool minRateExceeded = *PMINRR > 0 && pMonitor->m_lastPresentationTimer.getMillis() > 1000.0f / *PMINRR;
+                if (!minRateExceeded)
+                    return;
+            }
+            pMonitor->m_vrrFramePending = false;
+        }
+    }
+
     Event::bus()->m_events.render.pre.emit(pMonitor);
 
     const auto NOW = Time::steadyNow();
@@ -1923,14 +1938,17 @@ void CHyprRenderer::damageSurface(SP<CWLSurfaceResource> pSurface, double x, dou
     }
 
     // hack: schedule frame events
-    if (!WLSURF->resource()->m_current.callbacks.empty() && pSurface->m_hlSurface) {
-        const auto BOX = pSurface->m_hlSurface->getSurfaceBoxGlobal();
+    // Also schedule when VRR is active — explicit-sync clients (Proton/Wine)
+    // don't use wl_surface.frame callbacks so need this path for frame scheduling.
+    if (pSurface->m_hlSurface) {
+        const bool hasCallbacks = !WLSURF->resource()->m_current.callbacks.empty();
+        const auto BOX          = pSurface->m_hlSurface->getSurfaceBoxGlobal();
         if (BOX && !BOX->empty()) {
             for (auto const& m : g_pCompositor->m_monitors) {
                 if (!m->m_output)
                     continue;
 
-                if (BOX->overlaps(m->logicalBox()))
+                if (BOX->overlaps(m->logicalBox()) && (hasCallbacks || m->m_vrrActive))
                     g_pCompositor->scheduleFrameForMonitor(m, Aquamarine::IOutput::AQ_SCHEDULE_NEEDS_FRAME);
             }
         }
